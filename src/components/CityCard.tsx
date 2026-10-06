@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ImageBackground } from 'react-native';
+import { Trash2 } from 'lucide-react-native';
 import { CurrentWeatherData } from '../types/weather';
 import { getWeatherTheme } from '../api/weatherApi';
 
@@ -14,6 +15,7 @@ interface CityCardProps {
   weatherData: CurrentWeatherData;
   onPress: () => void;
   onLongPress?: () => void;
+  onDelete?: () => void;
   isCurrentLocation?: boolean;
 }
 
@@ -21,6 +23,7 @@ export const CityCard: React.FC<CityCardProps> = ({
   weatherData,
   onPress,
   onLongPress,
+  onDelete,
   isCurrentLocation = false,
 }) => {
   const iconCode = weatherData.weather?.[0]?.icon;
@@ -68,7 +71,22 @@ export const CityCard: React.FC<CityCardProps> = ({
                 </Text>
               ) : null}
             </View>
-            <Text style={styles.tempText}>{temp}°</Text>
+            <View style={styles.rightInfo}>
+              <Text style={styles.tempText}>{temp}°</Text>
+              {!isCurrentLocation && onDelete ? (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={`Xóa ${mainTitle}`}
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    onDelete();
+                  }}
+                  style={styles.deleteButton}
+                >
+                  <Trash2 size={16} color="#ffffff" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
           </View>
 
           <View style={styles.bottomRow}>
@@ -123,6 +141,19 @@ const styles = StyleSheet.create({
   leftInfo: {
     flex: 1,
     paddingRight: 10,
+  },
+  rightInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  deleteButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   mainTitle: {
     color: '#ffffff',
