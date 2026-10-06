@@ -1,11 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import { StyleSheet, View, ImageBackground, Animated, Dimensions } from 'react-native';
+import { StyleSheet, View, ImageBackground, Animated, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RainEffect } from './WeatherEffects/RainEffect';
 import { SunEffect } from './WeatherEffects/SunEffect';
 import { NightEffect } from './WeatherEffects/NightEffect';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export type WeatherType = 'rain' | 'sun' | 'cloud' | 'night';
 
@@ -26,6 +24,7 @@ export const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
   weatherType,
   children,
 }) => {
+  const { width, height } = useWindowDimensions();
   const panAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -63,11 +62,13 @@ export const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Ảnh nền thời tiết chân thực */}
+      {/* Ảnh nền thời tiết chân thực co giãn tự động theo mọi kích thước màn hình */}
       <Animated.View
         style={[
           styles.imageWrapper,
           {
+            width: width + 60,
+            height: height + 60,
             transform: [{ translateX: panAnim }, { scale: 1.08 }],
           },
         ]}
@@ -102,11 +103,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0f172a',
+    overflow: 'hidden',
   },
   imageWrapper: {
-    ...StyleSheet.absoluteFillObject,
-    width: SCREEN_WIDTH + 40,
-    height: SCREEN_HEIGHT + 40,
+    position: 'absolute',
+    top: -30,
+    left: -30,
   },
   backgroundImage: {
     width: '100%',

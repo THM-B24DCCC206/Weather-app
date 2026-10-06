@@ -26,7 +26,7 @@ export const CityCard: React.FC<CityCardProps> = ({
   const iconCode = weatherData.weather?.[0]?.icon;
   const conditionMain = weatherData.weather?.[0]?.main;
   const conditionDesc = weatherData.weather?.[0]?.description || '';
-  const theme = getWeatherTheme(iconCode, conditionMain);
+  const theme = getWeatherTheme(iconCode, conditionMain, weatherData.sys, weatherData.dt);
 
   const formattedCondition =
     conditionDesc.charAt(0).toUpperCase() + conditionDesc.slice(1);

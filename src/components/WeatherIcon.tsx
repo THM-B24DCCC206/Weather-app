@@ -39,8 +39,8 @@ export const WeatherIcon: React.FC<WeatherIconProps> = ({
     );
   }
 
-  // 2. Nắng có mây / Mây vài nơi (Few clouds / Sun behind cloud) - Apple Weather cloud.sun.fill
-  if (iconCode.startsWith('02')) {
+  // 2. Nắng có mây / Mây rải rác / Mây cụm ban ngày (Few/Scattered clouds) - Apple Weather cloud.sun.fill
+  if (iconCode.startsWith('02') || (iconCode.startsWith('03') && !isNight)) {
     if (isNight) {
       return (
         <View style={{ width: size + 4, height: size, justifyContent: 'center', alignItems: 'center' }}>
@@ -56,12 +56,12 @@ export const WeatherIcon: React.FC<WeatherIconProps> = ({
       );
     }
 
-    // Mặt trời vàng rực ló sau đám mây trắng chuẩn 100% Ảnh 2 (17:00 & Th 3)
+    // Mặt trời vàng rực ló sau đám mây trắng chuẩn 100% Apple Weather
     return (
       <View style={{ width: size + 4, height: size + 2, justifyContent: 'center', alignItems: 'center' }}>
         {/* Mặt trời vàng toả tia nắng ở góc trên phải */}
-        <View style={{ position: 'absolute', top: -1, right: -1 }}>
-          <Sun size={size * 0.72} color="#f59e0b" fill="#fbbf24" strokeWidth={2.2} />
+        <View style={{ position: 'absolute', top: -2, right: -2 }}>
+          <Sun size={size * 0.78} color="#f59e0b" fill="#fbbf24" strokeWidth={2.2} />
         </View>
         {/* Đám mây trắng đặc chồng lên phía trước */}
         <View style={{ position: 'absolute', bottom: 0, left: 0 }}>
@@ -71,8 +71,20 @@ export const WeatherIcon: React.FC<WeatherIconProps> = ({
     );
   }
 
-  // 3. Nhiều mây / Có mây (Scattered / Broken clouds) - Apple Weather cloud.fill
+  // 3. Nhiều mây / U ám (Overcast / Broken clouds) - Apple Weather cloud.fill
   if (iconCode.startsWith('03') || iconCode.startsWith('04')) {
+    if (isNight) {
+      return (
+        <View style={{ width: size + 4, height: size, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ position: 'absolute', top: -2, right: 0 }}>
+            <Moon size={size * 0.6} color="#94a3b8" fill="#cbd5e1" />
+          </View>
+          <View style={{ position: 'absolute', bottom: 0, left: 0 }}>
+            <Cloud size={size * 0.85} color="#cbd5e1" fill="#cbd5e1" />
+          </View>
+        </View>
+      );
+    }
     return (
       <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
         <Cloud size={size} color="#ffffff" fill="#ffffff" />

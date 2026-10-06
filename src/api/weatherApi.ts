@@ -99,71 +99,122 @@ export interface WeatherTheme {
   cardBorder: string;
 }
 
-// 7. Xác định Theme, Gradient và Hiệu ứng thời tiết (Mưa / Nắng / Mây / Đêm)
-export const getWeatherTheme = (iconCode?: string, conditionMain?: string): WeatherTheme => {
-  const isNight = iconCode ? iconCode.includes('n') : false;
-  const main = (conditionMain || '').toLowerCase();
+// 7. Hàm kiểm tra xem hiện tại là Ban ngày hay Ban đêm chuẩn xác
+export const checkIsNight = (
+  iconCode?: string,
+  sys?: { sunrise?: number; sunset?: number },
+  dt?: number
+): boolean => {
+  if (iconCode && iconCode.includes('n')) {
+    return true;
+  }
 
-  // 1. Mưa / Dông bão -> Hiệu ứng hạt mưa rơi
-  if (main.includes('rain') || main.includes('drizzle') || main.includes('mưa') || main.includes('thunder') || main.includes('sấm')) {
+  if (sys?.sunrise && sys?.sunset) {
+    const currentTimestamp = dt || Math.floor(Date.now() / 1000);
+    if (currentTimestamp < sys.sunrise || currentTimestamp >= sys.sunset) {
+      return true;
+    }
+  }
+
+  const currentHour = new Date().getHours();
+  if (currentHour >= 18 || currentHour < 6) {
+    return true;
+  }
+
+  return false;
+};
+
+// 8. Phân loại Theme & Ảnh nền chính xác giữa Nắng / Mây / Mưa / Đêm
+export const getWeatherTheme = (
+  iconCode?: string,
+  conditionMain?: string,
+  sys?: { sunrise?: number; sunset?: number },
+  dt?: number
+): WeatherTheme => {
+  const isNight = checkIsNight(iconCode, sys, dt);
+  const main = (conditionMain || '').toLowerCase();
+  const code = (iconCode || '').toLowerCase();
+
+  // 1. Mưa / Dông bão -> Nền mưa & Hạt mưa rơi
+  if (
+    main.includes('rain') ||
+    main.includes('drizzle') ||
+    main.includes('mưa') ||
+    main.includes('thunder') ||
+    main.includes('sấm')
+  ) {
     return {
       weatherType: 'rain',
-      gradientColors: ['#1e293b', '#2e3e50', '#141d26'],
+      gradientColors: ['#0f172a', '#1e293b', '#0f172a'],
       isLightBackground: false,
-      cardBg: 'rgba(255, 255, 255, 0.12)',
-      cardBorder: 'rgba(255, 255, 255, 0.12)',
+      cardBg: 'rgba(15, 23, 42, 0.68)',
+      cardBorder: 'rgba(255, 255, 255, 0.15)',
     };
   }
 
-  // 2. Ban đêm -> Sao lấp lánh & Ánh trăng
+  // 2. Ban đêm -> Nền đêm tối + Trăng sao lấp lánh
   if (isNight) {
     return {
       weatherType: 'night',
       gradientColors: ['#090d16', '#111827', '#030712'],
       isLightBackground: false,
-      cardBg: 'rgba(255, 255, 255, 0.1)',
-      cardBorder: 'rgba(255, 255, 255, 0.1)',
+      cardBg: 'rgba(15, 23, 42, 0.65)',
+      cardBorder: 'rgba(255, 255, 255, 0.18)',
     };
   }
 
-  // 3. Ban ngày trời quang / nắng gắt -> Hiệu ứng Nắng mặt trời + Tia sáng rực rỡ
-  if (main.includes('clear') || (iconCode && iconCode.startsWith('01d'))) {
+  // 3. Ban ngày mây dày u ám / râm mát
+  if (code.startsWith('04') || main.includes('overcast') || main.includes('u ám')) {
     return {
-      weatherType: 'sun',
-      gradientColors: ['#2563eb', '#38bdf8', '#60a5fa'],
+      weatherType: 'cloud',
+      gradientColors: ['#5b9bd5', '#8bbde2', '#bfe0f7'],
       isLightBackground: true,
-      cardBg: 'rgba(255, 255, 255, 0.22)',
-      cardBorder: 'rgba(255, 255, 255, 0.3)',
+      cardBg: 'rgba(24, 49, 79, 0.58)',
+      cardBorder: 'rgba(255, 255, 255, 0.2)',
     };
   }
 
-  // 4. Ban ngày có mây / râm mát (như Ảnh 2) -> Bầu trời xanh mây trắng bồng bềnh
+  // 4. Ban ngày có nắng (01d, 02d, 03d, Mây cụm, Mây rải rác)
   return {
-    weatherType: 'cloud',
-    gradientColors: ['#5b9bd5', '#8bbde2', '#bfe0f7'],
+    weatherType: 'sun',
+    gradientColors: ['#2563eb', '#38bdf8', '#60a5fa'],
     isLightBackground: true,
-    cardBg: 'rgba(255, 255, 255, 0.28)',
-    cardBorder: 'rgba(255, 255, 255, 0.38)',
+    cardBg: 'rgba(24, 49, 79, 0.58)',
+    cardBorder: 'rgba(255, 255, 255, 0.2)',
   };
 };
 
-// Giữ lại hàm cũ để tương thích
 export const getWeatherGradient = (iconCode?: string, conditionMain?: string): [string, string, ...string[]] => {
   return getWeatherTheme(iconCode, conditionMain).gradientColors;
 };
 
-// 8. Định dạng giờ (ví dụ: "14:00" hoặc "Bây giờ")
-export const formatForecastHour = (dtTxt: string, index: number): string => {
+// 9. Định dạng giờ chuẩn theo múi giờ Việt Nam từ Unix timestamp
+export const formatForecastHour = (timestampOrDtTxt: number | string, index: number): string => {
   if (index === 0) return 'Bây giờ';
-  const date = new Date(dtTxt);
+  let date: Date;
+  if (typeof timestampOrDtTxt === 'number') {
+    date = new Date(timestampOrDtTxt * 1000);
+  } else if (timestampOrDtTxt.includes('Z') || timestampOrDtTxt.includes('T')) {
+    date = new Date(timestampOrDtTxt);
+  } else {
+    // OpenWeather trả về chuỗi UTC (VD: "2026-10-06 00:00:00") -> chuyển sang Date theo UTC
+    date = new Date(timestampOrDtTxt.replace(' ', 'T') + 'Z');
+  }
   const hours = date.getHours().toString().padStart(2, '0');
   return `${hours}:00`;
 };
 
-// 9. Định dạng thứ trong tuần (Thứ Hai, Thứ Ba, Hôm nay...)
-export const formatForecastDay = (dtTxt: string, index: number): string => {
+// 10. Định dạng thứ trong tuần chuẩn theo Unix timestamp
+export const formatForecastDay = (timestampOrDtTxt: number | string, index: number): string => {
   if (index === 0) return 'Hôm nay';
-  const date = new Date(dtTxt);
+  let date: Date;
+  if (typeof timestampOrDtTxt === 'number') {
+    date = new Date(timestampOrDtTxt * 1000);
+  } else if (timestampOrDtTxt.includes('Z') || timestampOrDtTxt.includes('T')) {
+    date = new Date(timestampOrDtTxt);
+  } else {
+    date = new Date(timestampOrDtTxt.replace(' ', 'T') + 'Z');
+  }
   const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
   return days[date.getDay()];
 };

@@ -1,7 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { StyleSheet, View, Animated, Dimensions } from 'react-native';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+import React, { useEffect, useRef, useMemo } from 'react';
+import { StyleSheet, View, Animated, useWindowDimensions } from 'react-native';
 
 interface RainDropProps {
   startX: number;
@@ -9,9 +7,17 @@ interface RainDropProps {
   duration: number;
   length: number;
   opacity: number;
+  screenHeight: number;
 }
 
-const RainDrop: React.FC<RainDropProps> = ({ startX, delay, duration, length, opacity }) => {
+const RainDrop: React.FC<RainDropProps> = ({
+  startX,
+  delay,
+  duration,
+  length,
+  opacity,
+  screenHeight,
+}) => {
   const fallAnim = useRef(new Animated.Value(-60)).current;
 
   useEffect(() => {
@@ -19,7 +25,7 @@ const RainDrop: React.FC<RainDropProps> = ({ startX, delay, duration, length, op
       Animated.sequence([
         Animated.delay(delay),
         Animated.timing(fallAnim, {
-          toValue: SCREEN_HEIGHT + 60,
+          toValue: screenHeight + 80,
           duration: duration,
           useNativeDriver: true,
         }),
@@ -33,7 +39,7 @@ const RainDrop: React.FC<RainDropProps> = ({ startX, delay, duration, length, op
     animation.start();
 
     return () => animation.stop();
-  }, [delay, duration, fallAnim]);
+  }, [delay, duration, fallAnim, screenHeight]);
 
   return (
     <Animated.View
@@ -54,17 +60,21 @@ const RainDrop: React.FC<RainDropProps> = ({ startX, delay, duration, length, op
 };
 
 export const RainEffect: React.FC = () => {
-  // Tạo 45 giọt mưa ngẫu nhiên với độ trễ, vị trí và tốc độ khác nhau
-  const drops = useRef(
-    Array.from({ length: 45 }).map((_, i) => ({
-      id: i,
-      startX: Math.random() * (SCREEN_WIDTH + 80) - 40,
-      delay: Math.random() * 1200,
-      duration: 700 + Math.random() * 500,
-      length: 18 + Math.random() * 20,
-      opacity: 0.35 + Math.random() * 0.55,
-    }))
-  ).current;
+  const { width, height } = useWindowDimensions();
+
+  // Tạo 45 giọt mưa ngẫu nhiên với độ trễ, vị trí và tốc độ khác nhau co giãn theo độ rộng màn hình
+  const drops = useMemo(
+    () =>
+      Array.from({ length: 45 }).map((_, i) => ({
+        id: i,
+        startX: Math.random() * (width + 80) - 40,
+        delay: Math.random() * 1200,
+        duration: 700 + Math.random() * 500,
+        length: 18 + Math.random() * 20,
+        opacity: 0.35 + Math.random() * 0.55,
+      })),
+    [width]
+  );
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -76,6 +86,7 @@ export const RainEffect: React.FC = () => {
           duration={drop.duration}
           length={drop.length}
           opacity={drop.opacity}
+          screenHeight={height}
         />
       ))}
     </View>

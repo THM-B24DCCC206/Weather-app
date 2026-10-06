@@ -54,6 +54,9 @@ export interface ForecastItem {
     speed: number;
   };
   pop?: number; // Xác suất mưa (0-1)
+  rain?: {
+    '3h'?: number;
+  };
 }
 
 export interface ForecastData {

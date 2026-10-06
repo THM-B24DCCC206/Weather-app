@@ -1,7 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { StyleSheet, View, Animated, Dimensions } from 'react-native';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+import React, { useEffect, useRef, useMemo } from 'react';
+import { StyleSheet, View, Animated, useWindowDimensions } from 'react-native';
 
 interface StarProps {
   top: number;
@@ -52,15 +50,19 @@ const Star: React.FC<StarProps> = ({ top, left, size, delay }) => {
 };
 
 export const NightEffect: React.FC = () => {
-  const stars = useRef(
-    Array.from({ length: 35 }).map((_, i) => ({
-      id: i,
-      top: Math.random() * (SCREEN_HEIGHT * 0.6),
-      left: Math.random() * SCREEN_WIDTH,
-      size: 1.5 + Math.random() * 2.5,
-      delay: Math.random() * 2000,
-    }))
-  ).current;
+  const { width, height } = useWindowDimensions();
+
+  const stars = useMemo(
+    () =>
+      Array.from({ length: 35 }).map((_, i) => ({
+        id: i,
+        top: Math.random() * (height * 0.6),
+        left: Math.random() * width,
+        size: 1.5 + Math.random() * 2.5,
+        delay: Math.random() * 2000,
+      })),
+    [width, height]
+  );
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">

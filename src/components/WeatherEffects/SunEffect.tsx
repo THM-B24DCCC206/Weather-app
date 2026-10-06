@@ -1,9 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { StyleSheet, View, Animated, Dimensions } from 'react-native';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import { StyleSheet, View, Animated, useWindowDimensions } from 'react-native';
 
 export const SunEffect: React.FC = () => {
+  const { width } = useWindowDimensions();
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const flareAnim = useRef(new Animated.Value(0.7)).current;
@@ -109,6 +108,7 @@ export const SunEffect: React.FC = () => {
         style={[
           styles.lensFlare1,
           {
+            left: width * 0.45,
             opacity: flareAnim,
           },
         ]}
@@ -117,6 +117,7 @@ export const SunEffect: React.FC = () => {
         style={[
           styles.lensFlare2,
           {
+            left: width * 0.3,
             opacity: flareAnim,
           },
         ]}
@@ -168,7 +169,6 @@ const styles = StyleSheet.create({
   lensFlare1: {
     position: 'absolute',
     top: 150,
-    left: SCREEN_WIDTH * 0.45,
     width: 45,
     height: 45,
     borderRadius: 22.5,
@@ -177,7 +177,6 @@ const styles = StyleSheet.create({
   lensFlare2: {
     position: 'absolute',
     top: 220,
-    left: SCREEN_WIDTH * 0.3,
     width: 25,
     height: 25,
     borderRadius: 12.5,
