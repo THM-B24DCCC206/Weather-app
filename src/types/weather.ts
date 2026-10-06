@@ -78,3 +78,14 @@ export interface CitySearchResult {
   country: string;
   state?: string;
 }
+export interface SavedCityLocation{
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  temp: number;
+  condition: string;
+  tempMax: number;
+  tempMin: number;
+}
+
