@@ -66,11 +66,9 @@ export const NightEffect: React.FC = () => {
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {/* Vầng trăng đêm mờ ảo */}
       <View style={styles.moonGlow} />
       <View style={styles.moon} />
 
-      {/* Sao lấp lánh */}
       {stars.map((star) => (
         <Star
           key={star.id}

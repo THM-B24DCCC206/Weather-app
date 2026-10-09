@@ -34,8 +34,9 @@ export interface CurrentWeatherData {
     country?: string;
   };
   name: string;
-  subLocation?: string; // Tên thành phố / tỉnh chi tiết (vd: Thành Phố Hà Nội)
+  subLocation?: string;
   isCurrentLocation?: boolean;
+  timezone?: number;
 }
 
 export interface ForecastItem {
@@ -53,7 +54,7 @@ export interface ForecastItem {
   wind: {
     speed: number;
   };
-  pop?: number; // Xác suất mưa (0-1)
+  pop?: number;
   rain?: {
     '3h'?: number;
   };
@@ -78,3 +79,36 @@ export interface CitySearchResult {
   country: string;
   state?: string;
 }
+
+export interface SavedCityLocation {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  temp: number;
+  condition: string;
+  tempMax: number;
+  tempMin: number;
+}
+
+export type TempUnit = 'C' | 'F' | 'system';
+export type WindUnit = 'km/h' | 'mi/h' | 'mph' | 'm/s' | 'bft' | 'kn';
+export type RainUnit = 'mm' | 'cm' | 'in';
+export type PressureUnit = 'hPa' | 'inHg' | 'mmHg' | 'mbar' | 'atm';
+export type DistanceUnit = 'km' | 'mi' | 'NM';
+
+export interface WeatherUnitsSettings {
+  temp: TempUnit;
+  wind: WindUnit;
+  rain: RainUnit;
+  pressure: PressureUnit;
+  distance: DistanceUnit;
+}
+
+export const DEFAULT_WEATHER_UNITS: WeatherUnitsSettings = {
+  temp: 'C',
+  wind: 'km/h',
+  rain: 'mm',
+  pressure: 'hPa',
+  distance: 'km',
+};

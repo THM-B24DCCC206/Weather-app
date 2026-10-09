@@ -56,7 +56,6 @@ const FloatingCloud: React.FC<FloatingCloudProps> = ({
         },
       ]}
     >
-      {/* Khối mây bồng bềnh với nhiều khối tròn kết hợp */}
       <View style={styles.cloudBase} />
       <View style={styles.cloudPuff1} />
       <View style={styles.cloudPuff2} />
@@ -68,11 +67,9 @@ const FloatingCloud: React.FC<FloatingCloudProps> = ({
 export const CloudEffect: React.FC = () => {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {/* Lớp mây nền to mềm mại */}
       <View style={styles.staticCloudBackdrop1} />
       <View style={styles.staticCloudBackdrop2} />
 
-      {/* Các đám mây trôi tự nhiên ở các tầng khác nhau */}
       <FloatingCloud
         top={35}
         scale={1.2}

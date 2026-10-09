@@ -15,7 +15,6 @@ export const WindCompassDial: React.FC<WindCompassDialProps> = ({
   const center = size / 2;
   const radius = 55;
 
-  // Tạo 36 vạch chia độ quanh vòng tròn la bàn (mỗi vạch cách nhau 10°)
   const ticks = Array.from({ length: 36 }).map((_, i) => {
     const angle = i * 10;
     const isMajor = angle % 90 === 0;
@@ -52,7 +51,6 @@ export const WindCompassDial: React.FC<WindCompassDialProps> = ({
           viewBox={`0 0 ${size} ${size}`}
           style={{ overflow: 'visible' }}
         >
-          {/* Vòng tròn nền la bàn */}
           <circle
             cx={center}
             cy={center}
@@ -62,7 +60,6 @@ export const WindCompassDial: React.FC<WindCompassDialProps> = ({
             strokeWidth="1.2"
           />
 
-          {/* Vạch chia độ chuẩn đồng hồ hàng hải Apple */}
           {ticks.map((t) => (
             <line
               key={t.id}
@@ -75,7 +72,6 @@ export const WindCompassDial: React.FC<WindCompassDialProps> = ({
             />
           ))}
 
-          {/* Tam giác chỉ hướng Bắc ở đỉnh */}
           <polygon
             points={`${center},${center - radius + 2} ${center - 4},${
               center - radius + 9
@@ -83,16 +79,13 @@ export const WindCompassDial: React.FC<WindCompassDialProps> = ({
             fill="#38bdf8"
           />
 
-          {/* Kim chỉ hướng gió xoay chuẩn xác theo độ góc gió */}
           <g transform={`rotate(${windDeg} ${center} ${center})`}>
-            {/* Đầu kim nhọn chỉ hướng gió */}
             <polygon
               points={`${center},${center - radius - 1} ${center - 4.5},${
                 center - radius + 12
               } ${center + 4.5},${center - radius + 12}`}
               fill="#ffffff"
             />
-            {/* Đuôi kim */}
             <line
               x1={center}
               y1={center + radius - 10}
@@ -166,13 +159,11 @@ export const WindCompassDial: React.FC<WindCompassDialProps> = ({
     <View style={styles.container}>
       {renderSvgContent()}
 
-      {/* 4 Chữ cái chỉ hướng: B (Bắc), Đ (Đông), N (Nam), T (Tây) */}
       <Text style={styles.cardinalN}>B</Text>
       <Text style={styles.cardinalE}>Đ</Text>
       <Text style={styles.cardinalS}>N</Text>
       <Text style={styles.cardinalW}>T</Text>
 
-      {/* Chữ hướng gió lớn ở trung tâm (VD: B, ĐB, TN) */}
       <Text style={styles.centerHeading}>{windDirText}</Text>
     </View>
   );

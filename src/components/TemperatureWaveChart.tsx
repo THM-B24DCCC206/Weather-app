@@ -24,7 +24,6 @@ interface TemperatureWaveChartProps {
   minTemp: number;
 }
 
-// Hàm tạo đường cong Bézier mượt mà (Smooth Cubic Bezier Spline)
 function getSmoothCurvePath(points: { x: number; y: number }[]): string {
   if (points.length < 2) return '';
   let path = `M ${points[0].x},${points[0].y}`;
@@ -63,7 +62,6 @@ export const TemperatureWaveChart: React.FC<TemperatureWaveChartProps> = ({
   const rawMin = Math.min(...allTemps, minTemp);
   const rawMax = Math.max(...allTemps, maxTemp);
 
-  // Tạo các mốc trục Y cách nhau 3° chuẩn Apple Weather (VD: 36, 33, 30, 27, 24, 21, 18, 15)
   const yMax = Math.ceil((rawMax + 3) / 3) * 3;
   const yMin = Math.floor((rawMin - 3) / 3) * 3;
   const yStepsCount = 7;
@@ -102,7 +100,6 @@ export const TemperatureWaveChart: React.FC<TemperatureWaveChartProps> = ({
   const maxPoint = points.find((p) => p.isMax) || points[Math.floor(points.length / 2)];
   const minPoint = points.find((p) => p.isMin && p !== maxPoint) || points[points.length - 1];
 
-  // Cột thời gian hiện tại
   const currentHour = new Date().getHours();
   const currentIdx = Math.min(
     Math.max(0, Math.floor((currentHour / 24) * points.length)),
@@ -126,7 +123,6 @@ export const TemperatureWaveChart: React.FC<TemperatureWaveChartProps> = ({
             </linearGradient>
           </defs>
 
-          {/* Cột mờ Active biểu thị mốc thời gian hiện tại chuẩn iOS */}
           {activePoint && (
             <rect
               x={activePoint.x - 14}
@@ -137,7 +133,6 @@ export const TemperatureWaveChart: React.FC<TemperatureWaveChartProps> = ({
             />
           )}
 
-          {/* Các đường lưới ngang trục Y */}
           {ySteps.map((yVal, idx) => {
             const lineY =
               chartHeight - ((yVal - yMin) / range) * (chartHeight - 36) - 18;
@@ -154,10 +149,8 @@ export const TemperatureWaveChart: React.FC<TemperatureWaveChartProps> = ({
             );
           })}
 
-          {/* Lớp gradient dưới đường cong */}
           {fillPath ? <path d={fillPath} fill="url(#tempWaveGradient)" /> : null}
 
-          {/* Đường cong nhiệt độ nét đứt vàng chanh chuẩn Apple Weather */}
           {curvePath ? (
             <path
               d={curvePath}
@@ -169,7 +162,6 @@ export const TemperatureWaveChart: React.FC<TemperatureWaveChartProps> = ({
             />
           ) : null}
 
-          {/* Điểm cực đại Peak */}
           {maxPoint ? (
             <circle
               cx={maxPoint.x}
@@ -181,7 +173,6 @@ export const TemperatureWaveChart: React.FC<TemperatureWaveChartProps> = ({
             />
           ) : null}
 
-          {/* Điểm cực tiểu Trough */}
           {minPoint ? (
             <circle
               cx={minPoint.x}
@@ -193,7 +184,6 @@ export const TemperatureWaveChart: React.FC<TemperatureWaveChartProps> = ({
             />
           ) : null}
 
-          {/* Điểm mốc thời gian hiện tại */}
           {activePoint ? (
             <circle
               cx={activePoint.x}
@@ -295,7 +285,6 @@ export const TemperatureWaveChart: React.FC<TemperatureWaveChartProps> = ({
 
   return (
     <View style={styles.container} onLayout={onLayout}>
-      {/* 1. Hàng Icon thời tiết phía trên chuẩn Apple Weather */}
       <View style={[styles.iconsRow, { paddingLeft, paddingRight }]}>
         {points.map((p, idx) => (
           <View key={idx} style={styles.iconItem}>
@@ -304,11 +293,9 @@ export const TemperatureWaveChart: React.FC<TemperatureWaveChartProps> = ({
         ))}
       </View>
 
-      {/* 2. Vùng vẽ Biểu đồ đường cong SVG */}
       <View style={styles.svgWrapper}>
         {renderSvgContent()}
 
-        {/* Chữ C (Cao nhất) và T (Thấp nhất) tối giản sang trọng chuẩn Apple */}
         {maxPoint && (
           <View
             style={[
@@ -330,7 +317,6 @@ export const TemperatureWaveChart: React.FC<TemperatureWaveChartProps> = ({
           </View>
         )}
 
-        {/* Trục nhiệt độ Y bên phải với các mốc cách nhau 3° */}
         <View style={styles.yAxisColumn}>
           {ySteps.map((yVal, idx) => (
             <Text key={idx} style={styles.yAxisText}>
@@ -340,7 +326,6 @@ export const TemperatureWaveChart: React.FC<TemperatureWaveChartProps> = ({
         </View>
       </View>
 
-      {/* 3. Trục X hiển thị 4 mốc chuẩn: 00, 06, 12, 18 */}
       <View style={[styles.xAxisRow, { paddingLeft, paddingRight }]}>
         <Text style={styles.xAxisText}>00</Text>
         <Text style={styles.xAxisText}>06</Text>

@@ -78,7 +78,6 @@ export const RainProbabilityChart: React.FC<RainProbabilityChartProps> = ({ hour
         } Z`
       : '';
 
-  // Vị trí mốc thời gian hiện tại
   const currentHour = new Date().getHours();
   const currentIdx = Math.min(
     Math.max(0, Math.floor((currentHour / 24) * points.length)),
@@ -119,7 +118,6 @@ export const RainProbabilityChart: React.FC<RainProbabilityChartProps> = ({ hour
             </pattern>
           </defs>
 
-          {/* Nền gạch sọc chéo đặc trưng Apple Weather */}
           <rect
             x={paddingLeft}
             y={8}
@@ -128,7 +126,6 @@ export const RainProbabilityChart: React.FC<RainProbabilityChartProps> = ({ hour
             fill="url(#diagonalHatch)"
           />
 
-          {/* Đường lưới ngang 100%, 80%, 60%, 40%, 20%, 0% */}
           {ySteps.map((val, idx) => {
             const lineY = chartHeight - (val / 100) * (chartHeight - 36) - 18;
             return (
@@ -144,10 +141,8 @@ export const RainProbabilityChart: React.FC<RainProbabilityChartProps> = ({ hour
             );
           })}
 
-          {/* Lớp gradient vùng mưa */}
           {fillPath ? <path d={fillPath} fill="url(#rainAreaGradient)" /> : null}
 
-          {/* Đường vẽ xác suất mưa xanh ngọc */}
           {curvePath ? (
             <path
               d={curvePath}
@@ -158,7 +153,6 @@ export const RainProbabilityChart: React.FC<RainProbabilityChartProps> = ({ hour
             />
           ) : null}
 
-          {/* Cột chỉ báo Active tại mốc hiện tại */}
           {activePoint ? (
             <>
               <line
@@ -276,7 +270,6 @@ export const RainProbabilityChart: React.FC<RainProbabilityChartProps> = ({ hour
       <View style={styles.svgWrapper}>
         {renderSvgContent()}
 
-        {/* Huy hiệu hiển thị % tại mốc thời gian hiện tại */}
         {activePoint && (
           <View
             style={[
@@ -288,7 +281,6 @@ export const RainProbabilityChart: React.FC<RainProbabilityChartProps> = ({ hour
           </View>
         )}
 
-        {/* Trục Y bên phải: 100%, 80%, 60%, 40%, 20%, 0% */}
         <View style={styles.yAxisColumn}>
           {ySteps.map((val, idx) => (
             <Text key={idx} style={styles.yAxisText}>
@@ -298,7 +290,6 @@ export const RainProbabilityChart: React.FC<RainProbabilityChartProps> = ({ hour
         </View>
       </View>
 
-      {/* Trục X hiển thị 4 mốc: 00, 06, 12, 18 */}
       <View style={[styles.xAxisRow, { paddingLeft, paddingRight }]}>
         <Text style={styles.xAxisText}>00</Text>
         <Text style={styles.xAxisText}>06</Text>

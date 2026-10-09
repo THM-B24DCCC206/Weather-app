@@ -16,19 +16,20 @@ const weatherImages: Record<WeatherType, any> = {
 
 interface WeatherBackgroundProps {
   weatherType: WeatherType;
+  overlayColors?: [string, string];
   gradientColors?: [string, string, ...string[]];
   children?: React.ReactNode;
 }
 
 export const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
   weatherType,
+  overlayColors: customOverlayColors,
   children,
 }) => {
   const { width, height } = useWindowDimensions();
   const panAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Hiệu ứng dịch chuyển nhẹ nhàng (Parallax / Pan)
     const pan = Animated.loop(
       Animated.sequence([
         Animated.timing(panAnim, {
@@ -50,19 +51,19 @@ export const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
 
   const bgImage = weatherImages[weatherType] || weatherImages.cloud;
 
-  // Lớp phủ màu chuyển sắc nhẹ giúp giảm độ chói của mây trắng và làm nổi chữ 100%
-  const overlayColors: [string, string] =
+  const defaultOverlayColors: [string, string] =
     weatherType === 'cloud'
-      ? ['rgba(15, 35, 60, 0.25)', 'rgba(15, 35, 60, 0.45)']
+      ? ['rgba(50, 95, 145, 0.12)', 'rgba(25, 55, 90, 0.28)']
       : weatherType === 'sun'
-      ? ['rgba(15, 45, 80, 0.2)', 'rgba(15, 45, 80, 0.4)']
+      ? ['rgba(56, 189, 248, 0.04)', 'rgba(30, 58, 138, 0.22)']
       : weatherType === 'rain'
-      ? ['rgba(10, 20, 30, 0.4)', 'rgba(10, 20, 30, 0.6)']
-      : ['rgba(3, 7, 18, 0.3)', 'rgba(3, 7, 18, 0.5)'];
+      ? ['rgba(15, 25, 40, 0.38)', 'rgba(10, 18, 30, 0.6)']
+      : ['rgba(3, 7, 18, 0.3)', 'rgba(3, 7, 18, 0.55)'];
+
+  const overlayColors = customOverlayColors || defaultOverlayColors;
 
   return (
     <View style={styles.container}>
-      {/* Ảnh nền thời tiết chân thực co giãn tự động theo mọi kích thước màn hình */}
       <Animated.View
         style={[
           styles.imageWrapper,
@@ -78,7 +79,6 @@ export const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
           style={styles.backgroundImage}
           resizeMode="cover"
         >
-          {/* Lớp gradient chống chói, tăng tương phản chuẩn Apple Weather */}
           <LinearGradient
             colors={overlayColors}
             start={{ x: 0, y: 0 }}
@@ -88,12 +88,10 @@ export const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
         </ImageBackground>
       </Animated.View>
 
-      {/* Các lớp hạt chuyển động thời tiết */}
       {weatherType === 'rain' && <RainEffect />}
       {weatherType === 'sun' && <SunEffect />}
       {weatherType === 'night' && <NightEffect />}
 
-      {/* Nội dung giao diện */}
       {children}
     </View>
   );

@@ -21,24 +21,29 @@ const RainDrop: React.FC<RainDropProps> = ({
   const fallAnim = useRef(new Animated.Value(-60)).current;
 
   useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.timing(fallAnim, {
-          toValue: screenHeight + 80,
-          duration: duration,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fallAnim, {
-          toValue: -60,
-          duration: 0,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    animation.start();
+    let anim: Animated.CompositeAnimation | null = null;
+    const timeout = setTimeout(() => {
+      anim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(fallAnim, {
+            toValue: screenHeight + 80,
+            duration: duration,
+            useNativeDriver: true,
+          }),
+          Animated.timing(fallAnim, {
+            toValue: -60,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      anim.start();
+    }, delay);
 
-    return () => animation.stop();
+    return () => {
+      clearTimeout(timeout);
+      if (anim) anim.stop();
+    };
   }, [delay, duration, fallAnim, screenHeight]);
 
   return (
@@ -51,7 +56,7 @@ const RainDrop: React.FC<RainDropProps> = ({
           opacity: opacity,
           transform: [
             { translateY: fallAnim },
-            { rotate: '-12deg' }, // Góc nghiêng giọt mưa tự nhiên
+            { rotate: '-12deg' },
           ],
         },
       ]}
@@ -62,7 +67,6 @@ const RainDrop: React.FC<RainDropProps> = ({
 export const RainEffect: React.FC = () => {
   const { width, height } = useWindowDimensions();
 
-  // Tạo 45 giọt mưa ngẫu nhiên với độ trễ, vị trí và tốc độ khác nhau co giãn theo độ rộng màn hình
   const drops = useMemo(
     () =>
       Array.from({ length: 45 }).map((_, i) => ({

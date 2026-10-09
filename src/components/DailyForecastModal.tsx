@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { X, Cloud, ChevronDown, Droplets, Thermometer, Wind } from 'lucide-react-native';
 import { ForecastData, ForecastItem } from '../types/weather';
+import { getCalibratedRainPop } from '../utils/unitConverter';
 import { WeatherIcon } from './WeatherIcon';
 import { TemperatureWaveChart } from './TemperatureWaveChart';
 import { RainProbabilityChart } from './RainProbabilityChart';
@@ -69,7 +70,6 @@ export const DailyForecastModal: React.FC<DailyForecastModalProps> = ({
     }
   }, [visible, initialSelectedDayIndex, slideAnim]);
 
-  // Xử lý và tạo dữ liệu 24h đầy đủ 8 mốc theo đúng múi giờ địa phương
   const daysList: DaySummary[] = useMemo(() => {
     const standardHours = ['00', '03', '06', '09', '12', '15', '18', '21'];
     const dayNamesShort = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
@@ -86,7 +86,6 @@ export const DailyForecastModal: React.FC<DailyForecastModalProps> = ({
     const groupedByDate: { [key: string]: ForecastItem[] } = {};
     if (forecastData?.list) {
       forecastData.list.forEach((item) => {
-        // Chuyển timestamp UTC sang ngày theo giờ địa phương
         const d = new Date(item.dt * 1000);
         const dKey = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d
           .getDate()
@@ -141,11 +140,17 @@ export const DailyForecastModal: React.FC<DailyForecastModalProps> = ({
             iconCode = iconCode.replace('n', 'd');
           }
 
+          const calibratedPop = getCalibratedRainPop(
+            matched.pop || 0,
+            matched.rain?.['3h'] || 0,
+            matched.weather?.[0]?.description || ''
+          );
+
           return {
             hourStr: hStr,
             temp: Math.round(matched.main.temp),
             icon: iconCode,
-            pop: matched.pop ? Math.round(matched.pop * 100) : 0,
+            pop: calibratedPop,
           };
         }
 
@@ -206,7 +211,6 @@ export const DailyForecastModal: React.FC<DailyForecastModalProps> = ({
           },
         ]}
       >
-        {/* Modal Header với Tiêu đề căn giữa chuẩn iOS Apple Weather */}
         <View style={styles.sheetHeader}>
           <View style={{ width: 32, height: 32 }} />
 
@@ -220,7 +224,6 @@ export const DailyForecastModal: React.FC<DailyForecastModalProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Dải chọn ngày trong tuần (Chữ & số to rõ ràng chuẩn Apple Weather) */}
         <View style={styles.daySelectorSection}>
           <View style={styles.daySelectorRow}>
             {daysList.map((day, idx) => {
@@ -264,7 +267,6 @@ export const DailyForecastModal: React.FC<DailyForecastModalProps> = ({
           contentContainerStyle={styles.scrollInnerContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Hàng tổng quan nhiệt độ ngày */}
           <View style={styles.dayOverviewRow}>
             <View>
               <View style={styles.dayTempRow}>
@@ -284,7 +286,6 @@ export const DailyForecastModal: React.FC<DailyForecastModalProps> = ({
             </View>
           </View>
 
-          {/* 1. Biểu đồ đường cong nhiệt độ dạng sóng chuẩn Apple Weather */}
           <View style={styles.chartCard}>
             <TemperatureWaveChart
               hourlyPoints={activeDay.hourlyPoints}
@@ -293,7 +294,6 @@ export const DailyForecastModal: React.FC<DailyForecastModalProps> = ({
             />
           </View>
 
-          {/* 2. Khả năng có mưa (Rain Probability Area Chart) */}
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Khả năng có mưa</Text>
             <View style={styles.chartCard}>
@@ -301,7 +301,6 @@ export const DailyForecastModal: React.FC<DailyForecastModalProps> = ({
             </View>
           </View>
 
-          {/* 3. Tổng lượng mưa (24h qua & 24h tới) */}
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Tổng lượng mưa</Text>
             <View style={styles.precipCard}>
@@ -314,7 +313,6 @@ export const DailyForecastModal: React.FC<DailyForecastModalProps> = ({
                 </Text>
               </View>
 
-              {/* 2 Cột so sánh 24 GIỜ QUA và 24 GIỜ TỚI */}
               <View style={styles.precipColsRow}>
                 <View style={styles.precipColBox}>
                   <Text style={styles.precipColLabel}>24 GIỜ QUA</Text>
@@ -333,7 +331,6 @@ export const DailyForecastModal: React.FC<DailyForecastModalProps> = ({
                 </View>
               </View>
 
-              {/* Dải phân cấp mức độ mưa Apple Weather */}
               <View style={styles.precipBarSection}>
                 <View style={styles.precipScaleBar}>
                   <View
@@ -355,7 +352,6 @@ export const DailyForecastModal: React.FC<DailyForecastModalProps> = ({
             </View>
           </View>
 
-          {/* 4. So sánh hàng ngày (Daily Comparison) */}
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>So sánh hàng ngày</Text>
             <View style={styles.comparisonList}>
@@ -393,7 +389,6 @@ export const DailyForecastModal: React.FC<DailyForecastModalProps> = ({
             </View>
           </View>
 
-          {/* 5. Chi tiết ngày */}
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Chi tiết ngày</Text>
             <View style={styles.detailRowCards}>

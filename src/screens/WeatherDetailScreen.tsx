@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -8,62 +8,99 @@ import {
   StatusBar,
   TouchableOpacity,
   ActivityIndicator,
-  Dimensions,
+  useWindowDimensions,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   List,
-  ChevronLeft,
   Compass,
   Droplets,
   Wind,
   Eye,
   Sunrise,
-  Sunset,
   Gauge,
   Calendar,
-  Clock,
   Map as MapIcon,
   Navigation,
   Sun,
   Thermometer,
-  ArrowUp,
 } from 'lucide-react-native';
-import { CurrentWeatherData, ForecastData, ForecastItem } from '../types/weather';
+import {
+  CurrentWeatherData,
+  ForecastData,
+  ForecastItem,
+  WeatherUnitsSettings,
+  DEFAULT_WEATHER_UNITS,
+} from '../types/weather';
 import {
   fetchForecast,
   fetchForecastByCity,
   getWeatherTheme,
-  formatForecastHour,
+  getFormattedCondition,
   formatForecastDay,
 } from '../api/weatherApi';
+import {
+  formatTemperature,
+  formatWindSpeed,
+  formatPrecipitation,
+  formatPressure,
+  formatVisibility,
+  getCalibratedRainPop,
+} from '../utils/unitConverter';
 import { WeatherIcon } from '../components/WeatherIcon';
 import { WeatherBackground } from '../components/WeatherBackground';
 import { DailyForecastModal } from '../components/DailyForecastModal';
 import { SunTrajectoryArc } from '../components/SunTrajectoryArc';
 import { WindCompassDial } from '../components/WindCompassDial';
 
-interface WeatherDetailScreenProps {
-  weatherData: CurrentWeatherData;
-  isCurrentLocation?: boolean;
-  onBack: () => void;
+interface CityItem {
+  weather: CurrentWeatherData;
+  isCurrentLocation: boolean;
 }
 
-export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
+interface WeatherDetailScreenProps {
+  weatherData?: CurrentWeatherData;
+  isCurrentLocation?: boolean;
+  onBack: () => void;
+  isPreviewMode?: boolean;
+  onAddCity?: () => void;
+  isAlreadySaved?: boolean;
+  onOpenMap?: () => void;
+  cities?: CityItem[];
+  initialCityIndex?: number;
+  citiesCount?: number;
+  selectedCityIndex?: number;
+  onSelectCityIndex?: (index: number) => void;
+  onNextCity?: () => void;
+  units?: WeatherUnitsSettings;
+}
+
+interface WeatherCityPageViewProps {
+  weatherData: CurrentWeatherData;
+  isCurrentLocation: boolean;
+  isPreviewMode?: boolean;
+  onBack?: () => void;
+  onAddCity?: () => void;
+  isAlreadySaved?: boolean;
+  units?: WeatherUnitsSettings;
+}
+
+export const WeatherCityPageView: React.FC<WeatherCityPageViewProps> = ({
   weatherData,
-  isCurrentLocation = false,
+  isCurrentLocation,
+  isPreviewMode = false,
   onBack,
+  onAddCity,
+  isAlreadySaved = false,
+  units = DEFAULT_WEATHER_UNITS,
 }) => {
   const [forecast, setForecast] = useState<ForecastData | null>(null);
   const [loadingForecast, setLoadingForecast] = useState(true);
   const [showDailyModal, setShowDailyModal] = useState(false);
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
 
-  useEffect(() => {
-    loadForecastData();
-  }, [weatherData]);
-
-  const loadForecastData = async () => {
+  const loadForecastData = useCallback(async () => {
     try {
       setLoadingForecast(true);
       let data: ForecastData;
@@ -78,39 +115,62 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
     } finally {
       setLoadingForecast(false);
     }
-  };
+  }, [weatherData]);
+
+  useEffect(() => {
+    loadForecastData();
+  }, [loadForecastData]);
 
   const iconCode = weatherData.weather?.[0]?.icon;
   const conditionMain = weatherData.weather?.[0]?.main;
   const conditionDesc = weatherData.weather?.[0]?.description || '';
-  const theme = getWeatherTheme(iconCode, conditionMain, weatherData.sys, weatherData.dt);
+  const theme = getWeatherTheme(
+    iconCode,
+    conditionMain,
+    weatherData.sys,
+    weatherData.dt,
+    conditionDesc
+  );
 
-  // Viết hoa chữ cái đầu cho mô tả
-  const formattedCondition =
-    conditionDesc.charAt(0).toUpperCase() + conditionDesc.slice(1);
+  const formattedCondition = getFormattedCondition(iconCode, conditionDesc);
 
   const mainTitle = isCurrentLocation ? 'Vị trí của tôi' : weatherData.name;
   const subLocation = isCurrentLocation
     ? (weatherData.subLocation || weatherData.name).toUpperCase()
     : (weatherData.sys?.country || '').toUpperCase();
 
-  const temp = Math.round(weatherData.main?.temp || 0);
-  const tempMax = Math.round(weatherData.main?.temp_max || 0);
-  const tempMin = Math.round(weatherData.main?.temp_min || 0);
-  const feelsLike = Math.round(weatherData.main?.feels_like || 0);
-  const humidity = weatherData.main?.humidity || 0;
-  const windSpeedMs = weatherData.wind?.speed || 0;
-  const windSpeedKmh = Math.round(windSpeedMs * 3.6);
-  const windGustKmh = Math.round(
-    ((weatherData.wind as any)?.gust || windSpeedMs * 1.6) * 3.6
+  const temp = formatTemperature(weatherData.main?.temp || 0, units.temp);
+  const tempMax = formatTemperature(
+    weatherData.main?.temp_max ?? (weatherData.main?.temp || 0),
+    units.temp
   );
-  const windDeg = weatherData.wind?.deg || 0;
-  const pressure = weatherData.main?.pressure || 1013;
-  const visibilityKm = weatherData.visibility
-    ? (weatherData.visibility / 1000).toFixed(1)
-    : '10';
+  const tempMin = formatTemperature(
+    weatherData.main?.temp_min ?? ((weatherData.main?.temp || 0) - 5),
+    units.temp
+  );
+  const feelsLike = formatTemperature(
+    weatherData.main?.feels_like || 0,
+    units.temp
+  );
+  const humidity = weatherData.main?.humidity || 0;
 
-  // Xác định chữ viết tắt hướng gió (B, ĐB, Đ, ĐN, N, TN, T, TB)
+  const windSpeedMs = weatherData.wind?.speed || 0;
+  const windInfo = formatWindSpeed(windSpeedMs, units.wind);
+  const windGustMs = (weatherData.wind as any)?.gust || windSpeedMs * 1.6;
+  const windGustInfo = formatWindSpeed(windGustMs, units.wind);
+  const windDeg = weatherData.wind?.deg || 0;
+
+  const rawRain24h =
+    ((weatherData as any).rain?.['1h'] || 0) > 0
+      ? (weatherData as any).rain['1h']
+      : 0;
+  const rainInfo = formatPrecipitation(rawRain24h, units.rain);
+
+  const pressureHpa = weatherData.main?.pressure || 1013;
+  const pressureInfo = formatPressure(pressureHpa, units.pressure);
+
+  const visibilityInfo = formatVisibility(weatherData.visibility, units.distance);
+
   const getWindDirectionName = (deg: number) => {
     if (deg >= 337.5 || deg < 22.5) return 'B';
     if (deg >= 22.5 && deg < 67.5) return 'ĐB';
@@ -123,10 +183,10 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
   };
   const windDirText = getWindDirectionName(windDeg);
 
-  // Tính toán chỉ số UV ước lượng
   const currentHour = new Date().getHours();
   const isNight = currentHour >= 18 || currentHour < 6;
-  const uvVal = isNight ? 0 : Math.min(10, Math.max(1, Math.round((temp / 35) * 8)));
+  const rawTempC = weatherData.main?.temp || 0;
+  const uvVal = isNight ? 0 : Math.min(10, Math.max(1, Math.round((rawTempC / 35) * 8)));
   const uvCategory =
     uvVal === 0
       ? 'Thấp'
@@ -144,7 +204,6 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
       ? 'Thấp trong hầu hết thời gian.'
       : 'Chỉ số UV ở mức cao, khuyên dùng kem chống nắng.';
 
-  // Cảm nhận nhiệt độ
   const feelsLikeDiff = feelsLike - temp;
   const feelsLikeSub =
     Math.abs(feelsLikeDiff) <= 1
@@ -153,14 +212,11 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
       ? 'Độ ẩm khiến cảm giác ấm hơn.'
       : 'Gió khiến cảm giác mát hơn.';
 
-  // Lượng mưa 24h
-  const rain24h = ((weatherData as any).rain?.['1h'] || 0) > 0 ? (weatherData as any).rain['1h'] : 0;
   const rainSub =
-    rain24h > 0
+    rawRain24h > 0
       ? 'Dự báo có mưa rải rác.'
       : 'Dự báo tiếp theo là không có mưa đáng kể.';
 
-  // Tạo danh sách dự báo 24 giờ tiếp theo từng giờ một (1-hour step chuẩn Apple Weather)
   const hourlyDisplayList = React.useMemo(() => {
     const list: {
       id: string;
@@ -172,12 +228,17 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
     }[] = [];
     const now = new Date();
 
-    // 1. Mốc "Bây giờ"
-    const currentPop = forecast?.list?.[0]?.pop ? Math.round(forecast.list[0].pop * 100) : 0;
+    const rawCurrentPop = forecast?.list?.[0]?.pop || 0;
+    const rawCurrentRain = (weatherData as any).rain?.['1h'] || forecast?.list?.[0]?.rain?.['3h'] || 0;
+    const currentPop = getCalibratedRainPop(
+      rawCurrentPop,
+      rawCurrentRain,
+      weatherData.weather?.[0]?.description || ''
+    );
     list.push({
       id: 'now',
       timeText: 'Bây giờ',
-      temp: Math.round(weatherData.main?.temp || 0),
+      temp: formatTemperature(weatherData.main?.temp || 0, units.temp),
       icon: weatherData.weather?.[0]?.icon || '01d',
       pop: currentPop,
       isNow: true,
@@ -189,14 +250,12 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
 
     const forecastItems = forecast.list;
 
-    // 2. Tạo các mốc giờ kế tiếp trong vòng 24 giờ (1-hour step liên tục)
     for (let step = 1; step <= 24; step++) {
       const targetDate = new Date(now.getTime() + step * 3600 * 1000);
       const targetUnix = Math.floor(targetDate.getTime() / 1000);
       const targetHour = targetDate.getHours();
       const timeText = `${targetHour.toString().padStart(2, '0')}:00`;
 
-      // Tìm 2 mốc 3-giờ gần nhất trong forecast để nội suy nhiệt độ & trạng thái
       let prevItem = forecastItems[0];
       let nextItem = forecastItems[forecastItems.length - 1];
 
@@ -212,12 +271,16 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
 
       let interpolatedTemp: number;
       let pop = 0;
-      let iconCode = '01d';
+      let curIconCode = '01d';
 
       if (prevItem.dt === nextItem.dt) {
         interpolatedTemp = prevItem.main.temp;
-        pop = prevItem.pop ? Math.round(prevItem.pop * 100) : 0;
-        iconCode = prevItem.weather?.[0]?.icon || '01d';
+        curIconCode = prevItem.weather?.[0]?.icon || '01d';
+        pop = getCalibratedRainPop(
+          prevItem.pop || 0,
+          prevItem.rain?.['3h'] || 0,
+          prevItem.weather?.[0]?.description || ''
+        );
       } else {
         const ratio = Math.max(
           0,
@@ -225,49 +288,55 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
         );
         interpolatedTemp =
           prevItem.main.temp + (nextItem.main.temp - prevItem.main.temp) * ratio;
-        const prevPop = prevItem.pop ? Math.round(prevItem.pop * 100) : 0;
-        const nextPop = nextItem.pop ? Math.round(nextItem.pop * 100) : 0;
-        pop = Math.round(prevPop + (nextPop - prevPop) * ratio);
         const chosen = ratio < 0.5 ? prevItem : nextItem;
-        iconCode = chosen.weather?.[0]?.icon || '01d';
+        curIconCode = chosen.weather?.[0]?.icon || '01d';
+
+        const prevCalPop = getCalibratedRainPop(
+          prevItem.pop || 0,
+          prevItem.rain?.['3h'] || 0,
+          prevItem.weather?.[0]?.description || ''
+        );
+        const nextCalPop = getCalibratedRainPop(
+          nextItem.pop || 0,
+          nextItem.rain?.['3h'] || 0,
+          nextItem.weather?.[0]?.description || ''
+        );
+        const interpolatedPop = Math.round(prevCalPop + (nextCalPop - prevCalPop) * ratio);
+        pop = interpolatedPop > 0 ? Math.round(interpolatedPop / 5) * 5 : 0;
       }
 
-      // Kiểm tra ngày/đêm chính xác cho từng mốc giờ theo giờ địa phương
       const isNightHour = targetHour >= 18 || targetHour < 6;
-      if (isNightHour && iconCode.endsWith('d')) {
-        iconCode = iconCode.replace('d', 'n');
-      } else if (!isNightHour && iconCode.endsWith('n')) {
-        iconCode = iconCode.replace('n', 'd');
+      if (isNightHour && curIconCode.endsWith('d')) {
+        curIconCode = curIconCode.replace('d', 'n');
+      } else if (!isNightHour && curIconCode.endsWith('n')) {
+        curIconCode = curIconCode.replace('n', 'd');
       }
 
       list.push({
         id: `hour-${targetUnix}`,
         timeText,
-        temp: Math.round(interpolatedTemp),
-        icon: iconCode,
+        temp: formatTemperature(interpolatedTemp, units.temp),
+        icon: curIconCode,
         pop,
         isNow: false,
       });
     }
 
     return list;
-  }, [weatherData, forecast]);
+  }, [weatherData, forecast, units.temp]);
 
-  // Tạo dòng tóm tắt thông minh cho thẻ theo giờ trong tương lai
-  let hourlySummary = `Dự báo ${conditionDesc.toLowerCase()} trong những giờ tới.`;
+  let hourlySummary = `Dự báo ${formattedCondition.toLowerCase()} trong những giờ tới.`;
   if (hourlyDisplayList.length > 1) {
-    const nextRain = hourlyDisplayList.slice(1).find((it) => it.pop >= 40);
+    const nextRain = hourlyDisplayList.slice(1).find((it) => it.pop >= 30);
     if (nextRain) {
       hourlySummary = `Dự báo có khả năng mưa (${nextRain.pop}%) vào khoảng ${nextRain.timeText}.`;
     }
   }
 
-  // Gom nhóm dự báo theo ngày (5 ngày tới)
-  const dailyList: { day: string; min: number; max: number; icon: string; desc: string }[] = [];
+  const dailyList: { day: string; min: number; max: number; icon: string; desc: string; pop: number }[] = [];
   if (forecast?.list) {
     const grouped: { [key: string]: ForecastItem[] } = {};
     forecast.list.forEach((item) => {
-      // Chuyển timestamp dt sang ngày theo giờ địa phương
       const localDate = new Date(item.dt * 1000);
       const dateKey = `${localDate.getFullYear()}-${(localDate.getMonth() + 1)
         .toString()
@@ -279,18 +348,33 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
     Object.keys(grouped).forEach((dateKey, idx) => {
       const items = grouped[dateKey];
       const temps = items.map((i) => i.main.temp);
-      const min = Math.round(Math.min(...temps));
-      const max = Math.round(Math.max(...temps));
+      const min = Math.min(...temps);
+      const max = Math.max(...temps);
+
+      const popsInDay = items.map((i) =>
+        getCalibratedRainPop(
+          i.pop || 0,
+          i.rain?.['3h'] || 0,
+          i.weather?.[0]?.description || ''
+        )
+      );
+      const dayPop = popsInDay.length > 0 ? Math.max(...popsInDay) : 0;
+
       const middleItem = items[Math.floor(items.length / 2)];
       dailyList.push({
         day: formatForecastDay(middleItem.dt, idx),
-        min,
-        max,
+        min: formatTemperature(min, units.temp),
+        max: formatTemperature(max, units.temp),
         icon: middleItem.weather?.[0]?.icon || '01d',
         desc: middleItem.weather?.[0]?.description || '',
+        pop: dayPop,
       });
     });
   }
+
+  const overallMin = dailyList.length > 0 ? Math.min(...dailyList.map((d) => d.min)) : 0;
+  const overallMax = dailyList.length > 0 ? Math.max(...dailyList.map((d) => d.max)) : 40;
+  const tempSpan = Math.max(1, overallMax - overallMin);
 
   const formatSunTime = (timestamp?: number) => {
     if (!timestamp) return '--:--';
@@ -314,27 +398,39 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
   };
 
   return (
-    <WeatherBackground weatherType={theme.weatherType}>
+    <WeatherBackground weatherType={theme.weatherType} overlayColors={theme.overlayColors}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       <SafeAreaView style={styles.safeArea}>
-        {/* Top Header Navigation */}
-        <View style={styles.topNav}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={onBack}
-            activeOpacity={0.7}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <ChevronLeft size={28} color="#ffffff" />
-          </TouchableOpacity>
-        </View>
+        {isPreviewMode && (
+          <View style={[styles.topNav, styles.previewTopNav]}>
+            <TouchableOpacity
+              onPress={onBack}
+              activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 15, right: 15 }}
+            >
+              <Text style={styles.previewCancelText}>Hủy</Text>
+            </TouchableOpacity>
+
+            {!isAlreadySaved && onAddCity ? (
+              <TouchableOpacity
+                onPress={onAddCity}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 15, right: 15 }}
+              >
+                <Text style={styles.previewAddText}>Thêm</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={{ width: 40 }} />
+            )}
+          </View>
+        )}
 
         <ScrollView
           style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, !isPreviewMode && styles.scrollContentWithBottomBar]}
           showsVerticalScrollIndicator={false}
+          directionalLockEnabled={true}
         >
-          {/* Header Thông tin thời tiết lớn */}
           <View style={styles.heroSection}>
             <Text style={styles.mainTitle}>{mainTitle}</Text>
             {subLocation ? <Text style={styles.subLocation}>{subLocation}</Text> : null}
@@ -345,7 +441,6 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
             </Text>
           </View>
 
-          {/* 1. Dự báo theo giờ (Chuẩn múi giờ địa phương) */}
           <TouchableOpacity
             activeOpacity={0.88}
             onPress={() => handleOpenDayModal(0)}
@@ -379,7 +474,6 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
             )}
           </TouchableOpacity>
 
-          {/* 2. Dự báo 5 ngày */}
           <View style={[styles.cardWrapper, cardStyle]}>
             <View style={styles.cardHeader}>
               <Calendar size={15} color="#cbd5e1" style={{ marginRight: 6 }} />
@@ -390,39 +484,64 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
               <ActivityIndicator size="small" color="#ffffff" style={{ marginVertical: 20 }} />
             ) : (
               <View style={styles.dailyListContainer}>
-                {dailyList.map((item, idx) => (
-                  <TouchableOpacity
-                    key={`${item.day}-${idx}`}
-                    style={styles.dailyRow}
-                    activeOpacity={0.7}
-                    onPress={() => handleOpenDayModal(idx)}
-                  >
-                    <Text style={styles.dailyDayName}>{item.day}</Text>
-                    <View style={styles.dailyIconWrapper}>
-                      <WeatherIcon iconCode={item.icon} size={24} />
-                    </View>
-                    <View style={styles.dailyTempRange}>
+                {dailyList.map((item, idx) => {
+                  const leftRatio = (item.min - overallMin) / tempSpan;
+                  const widthRatio = (item.max - item.min) / tempSpan;
+                  const leftPercent = Math.max(0, Math.min(100, leftRatio * 100));
+                  const widthPercent = Math.max(15, Math.min(100 - leftPercent, widthRatio * 100));
+
+                  const curTemp = formatTemperature(weatherData.main?.temp || 0, units.temp);
+                  const curTempRatio = (curTemp - overallMin) / tempSpan;
+                  const curTempPercent = Math.max(2, Math.min(98, curTempRatio * 100));
+
+                  return (
+                    <TouchableOpacity
+                      key={`${item.day}-${idx}`}
+                      style={[styles.dailyRow, idx > 0 && styles.dailyRowBorder]}
+                      activeOpacity={0.7}
+                      onPress={() => handleOpenDayModal(idx)}
+                    >
+                      <Text style={styles.dailyDayName} numberOfLines={1}>
+                        {item.day}
+                      </Text>
+                      <View style={styles.dailyIconWrapper}>
+                        <WeatherIcon iconCode={item.icon} size={24} />
+                        {item.pop >= 25 ? (
+                          <Text style={styles.dailyPopText}>{item.pop}%</Text>
+                        ) : null}
+                      </View>
                       <Text style={styles.dailyMinTemp}>{item.min}°</Text>
-                      {/* Thanh dải nhiệt độ Apple Weather */}
-                      <View style={styles.tempBarBackground}>
+                      <View style={styles.tempBarTrack}>
                         <LinearGradient
                           colors={['#38bdf8', '#fbbf24', '#f97316']}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 1, y: 0 }}
-                          style={styles.tempBarActive}
+                          style={[
+                            styles.tempBarSegment,
+                            {
+                              left: `${leftPercent}%`,
+                              width: `${widthPercent}%`,
+                            },
+                          ]}
                         />
+                        {idx === 0 ? (
+                          <View
+                            style={[
+                              styles.tempCurrentDot,
+                              { left: `${curTempPercent}%` },
+                            ]}
+                          />
+                        ) : null}
                       </View>
                       <Text style={styles.dailyMaxTemp}>{item.max}°</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
           </View>
 
-          {/* 3. Lưới các thẻ chỉ số chi tiết chuẩn 100% Apple Weather */}
           <View style={styles.gridContainer}>
-            {/* Hàng 1: CHỈ SỐ UV & MẶT TRỜI MỌC */}
             <View style={[styles.gridCard, cardStyle]}>
               <View style={styles.gridCardHeader}>
                 <Sun size={14} color="#cbd5e1" />
@@ -431,7 +550,6 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
               <Text style={styles.gridCardValue}>{uvVal}</Text>
               <Text style={styles.gridCardCategory}>{uvCategory}</Text>
 
-              {/* Dải gradient chỉ số UV */}
               <View style={styles.uvBarWrapper}>
                 <LinearGradient
                   colors={['#22c55e', '#fbbf24', '#f97316', '#ef4444', '#a855f7']}
@@ -459,7 +577,6 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
                 {formatSunTime(weatherData.sys?.sunrise)}
               </Text>
 
-              {/* Vòng cung quỹ đạo hình sin mặt trời chuẩn Apple Weather */}
               <SunTrajectoryArc
                 sunriseTs={weatherData.sys?.sunrise}
                 sunsetTs={weatherData.sys?.sunset}
@@ -471,7 +588,6 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
               </Text>
             </View>
 
-            {/* Hàng 2: Thẻ GIÓ (Full Width Card với La bàn chuẩn Apple Weather) */}
             <View style={[styles.wideGridCard, cardStyle]}>
               <View style={styles.gridCardHeader}>
                 <Wind size={14} color="#cbd5e1" />
@@ -479,11 +595,10 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
               </View>
 
               <View style={styles.windCardContentRow}>
-                {/* Cột trái: Tốc độ gió & Gió giật */}
                 <View style={styles.windStatsCol}>
                   <View style={styles.windStatItem}>
                     <Text style={styles.windBigNumber}>
-                      {windSpeedKmh} <Text style={styles.windUnitText}>km/h</Text>
+                      {windInfo.value} <Text style={styles.windUnitText}>{windInfo.unitText}</Text>
                     </Text>
                     <Text style={styles.windStatLabel}>Gió</Text>
                   </View>
@@ -492,18 +607,16 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
 
                   <View style={styles.windStatItem}>
                     <Text style={styles.windBigNumber}>
-                      {windGustKmh} <Text style={styles.windUnitText}>km/h</Text>
+                      {windGustInfo.value} <Text style={styles.windUnitText}>{windGustInfo.unitText}</Text>
                     </Text>
                     <Text style={styles.windStatLabel}>Gió giật</Text>
                   </View>
                 </View>
 
-                {/* Cột phải: Mặt đồng hồ La bàn với 36 vạch chia độ và kim xoay */}
                 <WindCompassDial windDeg={windDeg} windDirText={windDirText} />
               </View>
             </View>
 
-            {/* Hàng 3: CẢM NHẬN & LƯỢNG MƯA */}
             <View style={[styles.gridCard, cardStyle]}>
               <View style={styles.gridCardHeader}>
                 <Thermometer size={14} color="#cbd5e1" />
@@ -520,14 +633,15 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
                 <Droplets size={14} color="#cbd5e1" />
                 <Text style={styles.gridCardHeaderTitle}>LƯỢNG MƯA</Text>
               </View>
-              <Text style={styles.gridCardValue}>{rain24h} mm</Text>
+              <Text style={styles.gridCardValue}>
+                {rainInfo.value} {rainInfo.unitText}
+              </Text>
               <Text style={styles.gridCardCategory}>trong 24 giờ qua</Text>
               <View style={styles.gridCardSubWrapper}>
                 <Text style={styles.gridCardSub}>{rainSub}</Text>
               </View>
             </View>
 
-            {/* Hàng 4: ĐỘ ẨM & TẦM NHÌN */}
             <View style={[styles.gridCard, cardStyle]}>
               <View style={styles.gridCardHeader}>
                 <Droplets size={14} color="#cbd5e1" />
@@ -544,21 +658,26 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
                 <Eye size={14} color="#cbd5e1" />
                 <Text style={styles.gridCardHeaderTitle}>TẦM NHÌN</Text>
               </View>
-              <Text style={styles.gridCardValue}>{visibilityKm} km</Text>
+              <Text style={styles.gridCardValue}>
+                {visibilityInfo.value} {visibilityInfo.unitText}
+              </Text>
               <View style={styles.gridCardSubWrapper}>
                 <Text style={styles.gridCardSub}>
-                  {Number(visibilityKm) >= 10 ? 'Rất quang đãng' : 'Hạn chế tầm nhìn'}
+                  {Number(visibilityInfo.value) >= 10 || visibilityInfo.unitText === 'mi' && Number(visibilityInfo.value) >= 6
+                    ? 'Rất quang đãng'
+                    : 'Hạn chế tầm nhìn'}
                 </Text>
               </View>
             </View>
 
-            {/* Hàng 5: ÁP SUẤT & HƯỚNG GIÓ */}
             <View style={[styles.gridCard, cardStyle]}>
               <View style={styles.gridCardHeader}>
                 <Gauge size={14} color="#cbd5e1" />
                 <Text style={styles.gridCardHeaderTitle}>ÁP SUẤT</Text>
               </View>
-              <Text style={styles.gridCardValue}>{pressure} hPa</Text>
+              <Text style={styles.gridCardValue}>
+                {pressureInfo.value} {pressureInfo.unitText}
+              </Text>
               <View style={styles.gridCardSubWrapper}>
                 <Text style={styles.gridCardSub}>Áp suất tiêu chuẩn</Text>
               </View>
@@ -577,30 +696,6 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
           </View>
         </ScrollView>
 
-        {/* Thanh điều hướng chân trang */}
-        <View style={styles.bottomBar}>
-          <TouchableOpacity
-            style={styles.bottomBarIcon}
-            onPress={() => {}}
-            activeOpacity={0.7}
-          >
-            <MapIcon size={24} color="#ffffff" />
-          </TouchableOpacity>
-
-          <View style={styles.locationIndicator}>
-            <Navigation size={15} color="#ffffff" style={{ transform: [{ rotate: '45deg' }] }} />
-          </View>
-
-          <TouchableOpacity
-            style={styles.bottomBarIcon}
-            onPress={onBack}
-            activeOpacity={0.7}
-          >
-            <List size={26} color="#ffffff" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Bottom Sheet Modal chi tiết ngày */}
         <DailyForecastModal
           visible={showDailyModal}
           onClose={() => setShowDailyModal(false)}
@@ -612,150 +707,332 @@ export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
   );
 };
 
+export const WeatherDetailScreen: React.FC<WeatherDetailScreenProps> = ({
+  weatherData,
+  isCurrentLocation = false,
+  onBack,
+  isPreviewMode = false,
+  onAddCity,
+  isAlreadySaved = false,
+  onOpenMap,
+  cities,
+  initialCityIndex = 0,
+  citiesCount,
+  selectedCityIndex,
+  onSelectCityIndex,
+  onNextCity,
+  units = DEFAULT_WEATHER_UNITS,
+}) => {
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
+  const horizontalScrollViewRef = useRef<ScrollView>(null);
+
+  const citiesList: CityItem[] = React.useMemo(() => {
+    if (cities && cities.length > 0) return cities;
+    if (weatherData) return [{ weather: weatherData, isCurrentLocation }];
+    return [];
+  }, [cities, weatherData, isCurrentLocation]);
+
+  const [activeIndex, setActiveIndex] = useState<number>(
+    initialCityIndex ?? selectedCityIndex ?? 0
+  );
+
+  useEffect(() => {
+    const targetIdx = initialCityIndex ?? selectedCityIndex ?? 0;
+    if (targetIdx >= 0 && targetIdx < citiesList.length) {
+      setActiveIndex(targetIdx);
+      horizontalScrollViewRef.current?.scrollTo({
+        x: targetIdx * SCREEN_WIDTH,
+        animated: false,
+      });
+    }
+  }, [initialCityIndex, selectedCityIndex, SCREEN_WIDTH, citiesList.length]);
+
+  const scrollToCity = (index: number) => {
+    if (index >= 0 && index < citiesList.length) {
+      setActiveIndex(index);
+      horizontalScrollViewRef.current?.scrollTo({
+        x: index * SCREEN_WIDTH,
+        animated: true,
+      });
+      onSelectCityIndex?.(index);
+    }
+  };
+
+  const handleNextCity = () => {
+    if (citiesList.length > 1) {
+      const nextIdx = (activeIndex + 1) % citiesList.length;
+      scrollToCity(nextIdx);
+    }
+    onNextCity?.();
+  };
+
+  if (isPreviewMode && weatherData) {
+    return (
+      <WeatherCityPageView
+        weatherData={weatherData}
+        isCurrentLocation={isCurrentLocation}
+        isPreviewMode={true}
+        onBack={onBack}
+        onAddCity={onAddCity}
+        isAlreadySaved={isAlreadySaved}
+        units={units}
+      />
+    );
+  }
+
+  const effectiveCount = citiesCount || citiesList.length;
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+      <ScrollView
+        ref={horizontalScrollViewRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        directionalLockEnabled={true}
+        bounces={true}
+        decelerationRate="fast"
+        scrollEventThrottle={16}
+        contentOffset={{
+          x: (initialCityIndex ?? selectedCityIndex ?? 0) * SCREEN_WIDTH,
+          y: 0,
+        }}
+        onMomentumScrollEnd={(e) => {
+          const pageIndex = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+          if (pageIndex >= 0 && pageIndex < citiesList.length) {
+            setActiveIndex(pageIndex);
+            onSelectCityIndex?.(pageIndex);
+          }
+        }}
+        style={StyleSheet.absoluteFill}
+      >
+        {citiesList.map((item, idx) => (
+          <View
+            key={`${item.weather.name}-${item.weather.coord?.lat}-${item.weather.coord?.lon}-${idx}`}
+            style={{ width: SCREEN_WIDTH, height: '100%' }}
+          >
+            <WeatherCityPageView
+              weatherData={item.weather}
+              isCurrentLocation={item.isCurrentLocation}
+              onBack={onBack}
+              units={units}
+            />
+          </View>
+        ))}
+      </ScrollView>
+
+      <SafeAreaView style={styles.floatingBottomBarWrapper} pointerEvents="box-none">
+        <View style={styles.bottomBar}>
+          <TouchableOpacity
+            style={styles.bottomBarIcon}
+            onPress={onOpenMap}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <MapIcon size={24} color="#ffffff" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.pageIndicatorContainer}
+            onPress={handleNextCity}
+            activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
+          >
+            <TouchableOpacity
+              onPress={() => scrollToCity(0)}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+              style={styles.indicatorTouch}
+            >
+              <Navigation
+                size={14}
+                color="#ffffff"
+                style={{
+                  transform: [{ rotate: '45deg' }],
+                  opacity: activeIndex === 0 ? 1 : 0.4,
+                }}
+              />
+            </TouchableOpacity>
+
+            {Array.from({ length: Math.max(0, effectiveCount - 1) }).map(
+              (_, idx) => {
+                const cityIdx = idx + 1;
+                const isActive = activeIndex === cityIdx;
+                return (
+                  <TouchableOpacity
+                    key={cityIdx}
+                    onPress={() => scrollToCity(cityIdx)}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+                    style={styles.indicatorTouch}
+                  >
+                    <View
+                      style={[
+                        styles.indicatorDot,
+                        isActive
+                          ? styles.indicatorDotActive
+                          : styles.indicatorDotInactive,
+                      ]}
+                    />
+                  </TouchableOpacity>
+                );
+              }
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.bottomBarIcon}
+            onPress={onBack}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <List size={26} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </View>
+  );
+};
+
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
   safeArea: {
     flex: 1,
   },
   topNav: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 4,
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 6 : 8,
+    minHeight: 44,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  previewTopNav: {
+    backgroundColor: 'transparent',
+    borderBottomWidth: 0,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  previewCancelText: {
+    color: '#ffffff',
+    fontSize: 17,
+    fontWeight: '500',
+  },
+  previewAddText: {
+    color: '#ffffff',
+    fontSize: 17,
+    fontWeight: '600',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingBottom: 35,
-    alignItems: 'center',
+    paddingBottom: 30,
+  },
+  scrollContentWithBottomBar: {
+    paddingBottom: 80,
   },
   heroSection: {
     alignItems: 'center',
-    marginVertical: 14,
+    paddingTop: 10,
+    paddingBottom: 24,
   },
   mainTitle: {
     color: '#ffffff',
-    fontSize: 30,
-    fontWeight: '700',
+    fontSize: 34,
+    fontWeight: '400',
+    letterSpacing: 0.35,
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.45)',
-    textShadowOffset: { width: 0, height: 1.5 },
-    textShadowRadius: 4,
   },
   subLocation: {
-    color: '#f8fafc',
+    color: '#cbd5e1',
     fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-    marginTop: 3,
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginTop: 2,
+    marginBottom: 2,
   },
   tempText: {
     color: '#ffffff',
-    fontSize: 86,
+    fontSize: 92,
     fontWeight: '200',
-    marginVertical: 2,
-    textShadowColor: 'rgba(0, 0, 0, 0.35)',
-    textShadowOffset: { width: 0, height: 1.5 },
-    textShadowRadius: 5,
+    letterSpacing: -2,
+    marginVertical: -8,
   },
   conditionText: {
-    color: '#ffffff',
+    color: '#e2e8f0',
     fontSize: 20,
-    fontWeight: '600',
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    fontWeight: '500',
+    marginTop: 2,
   },
   minMaxText: {
-    color: '#f8fafc',
+    color: '#ffffff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
     marginTop: 4,
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
   cardWrapper: {
-    width: '100%',
-    borderRadius: 20,
-    padding: 16,
-    marginVertical: 7,
+    borderRadius: 16,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  hourlySummaryText: {
-    color: '#f1f5f9',
-    fontSize: 13,
-    fontWeight: '600',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.18)',
-    paddingBottom: 10,
-    marginBottom: 10,
+    padding: 14,
+    marginBottom: 12,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.18)',
-    paddingBottom: 8,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   cardHeaderTitle: {
-    color: '#cbd5e1',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.6,
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  hourlySummaryText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 12,
+    lineHeight: 18,
   },
   hourlyScrollContent: {
-    paddingVertical: 4,
-    paddingHorizontal: 2,
+    flexDirection: 'row',
+    paddingVertical: 2,
   },
   hourlyItem: {
     alignItems: 'center',
-    marginRight: 20,
-    minWidth: 44,
+    width: 60,
+    marginRight: 6,
   },
   hourlyTime: {
     color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 8,
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 6,
   },
   hourlyIconWrapper: {
-    marginVertical: 4,
     height: 32,
-    width: 36,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 4,
   },
   hourlyPop: {
-    color: '#67e8f9',
+    color: '#38bdf8',
     fontSize: 11,
     fontWeight: '700',
-    marginVertical: 2,
+    height: 16,
   },
   hourlyTemp: {
     color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '700',
-    marginTop: 4,
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 2,
   },
   dailyListContainer: {
     paddingVertical: 2,
@@ -763,113 +1040,116 @@ const styles = StyleSheet.create({
   dailyRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingVertical: 9,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  dailyRowBorder: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255, 255, 255, 0.15)',
   },
   dailyDayName: {
     color: '#ffffff',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
-    width: 90,
+    width: 82,
   },
   dailyIconWrapper: {
     width: 36,
-    height: 28,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  dailyTempRange: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginLeft: 10,
+  dailyPopText: {
+    color: '#38bdf8',
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: -2,
   },
   dailyMinTemp: {
-    color: '#cbd5e1',
-    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.55)',
+    fontSize: 16,
     fontWeight: '600',
     width: 32,
     textAlign: 'right',
+    marginRight: 8,
   },
-  tempBarBackground: {
+  tempBarTrack: {
     flex: 1,
-    height: 5,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    borderRadius: 2.5,
-    marginHorizontal: 12,
-    overflow: 'hidden',
+    height: 4.5,
+    borderRadius: 2.25,
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    position: 'relative',
+    justifyContent: 'center',
   },
-  tempBarActive: {
-    height: '100%',
-    width: '100%',
-    borderRadius: 2.5,
+  tempBarSegment: {
+    position: 'absolute',
+    height: 4.5,
+    borderRadius: 2.25,
+  },
+  tempCurrentDot: {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#0f172a',
+    marginLeft: -4,
+    top: -1.75,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.35,
+    shadowRadius: 1.5,
+    elevation: 3,
   },
   dailyMaxTemp: {
     color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
     width: 32,
     textAlign: 'left',
+    marginLeft: 8,
   },
   gridContainer: {
-    width: '100%',
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginTop: 4,
+    gap: 12,
   },
   gridCard: {
-    width: '48.5%',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 12,
+    width: '48%',
+    borderRadius: 16,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-    minHeight: 148,
+    padding: 14,
+    minHeight: 142,
     justifyContent: 'space-between',
   },
   wideGridCard: {
     width: '100%',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    padding: 14,
+    minHeight: 142,
   },
   gridCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
-    gap: 6,
+    gap: 5,
   },
   gridCardHeaderTitle: {
-    color: '#cbd5e1',
+    color: '#94a3b8',
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
     letterSpacing: 0.5,
   },
   gridCardValue: {
     color: '#ffffff',
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '700',
-    marginVertical: 1,
+    marginTop: 4,
   },
   gridCardCategory: {
     color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: '600',
   },
   gridCardSubWrapper: {
     marginTop: 6,
@@ -880,19 +1160,20 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   uvBarWrapper: {
-    position: 'relative',
+    width: '100%',
     height: 4.5,
-    marginVertical: 8,
+    borderRadius: 2.25,
+    marginVertical: 6,
+    position: 'relative',
     justifyContent: 'center',
   },
   uvGradientBar: {
-    height: 4.5,
-    borderRadius: 2.25,
     width: '100%',
+    height: '100%',
+    borderRadius: 2.25,
   },
   uvDotIndicator: {
     position: 'absolute',
-    top: -2.5,
     width: 9.5,
     height: 9.5,
     borderRadius: 4.75,
@@ -933,9 +1214,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     marginVertical: 6,
   },
+  floatingBottomBarWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+  },
   bottomBar: {
     height: 54,
-    backgroundColor: 'rgba(10, 20, 35, 0.5)',
+    backgroundColor: 'rgba(10, 20, 35, 0.65)',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(255, 255, 255, 0.15)',
     flexDirection: 'row',
@@ -946,10 +1234,31 @@ const styles = StyleSheet.create({
   bottomBarIcon: {
     padding: 8,
   },
-  locationIndicator: {
-    width: 28,
-    height: 28,
+  pageIndicatorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    gap: 7,
+  },
+  indicatorTouch: {
+    padding: 3,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  indicatorDot: {
+    width: 6.5,
+    height: 6.5,
+    borderRadius: 3.25,
+  },
+  indicatorDotActive: {
+    backgroundColor: '#ffffff',
+    opacity: 1,
+    transform: [{ scale: 1.2 }],
+  },
+  indicatorDotInactive: {
+    backgroundColor: '#ffffff',
+    opacity: 0.4,
   },
 });
